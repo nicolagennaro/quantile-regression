@@ -41,7 +41,7 @@ ggplot(data = engel) + geom_point(mapping = aes(x=income, y=foodexp)) +
 
 
 
-summary(fit1)
+summary.rq(fit1)
 res1 <- resid(fit1)
 res1
 head(res1)
@@ -84,9 +84,15 @@ ggplot(df, aes(sample = y)) +
 taus <- c(0.05, 0.1, 0.5, 0.9, 0.95)
 fit <- lm(foodexp ~ income, data=engel)
 plt <- ggplot(data = engel) + geom_point(mapping = aes(x=income, y=foodexp)) +
-        geom_abline( aes(intercept = coef(fit)[1], slope = coef(fit)[2], color='Mean'), size=1 )
+        geom_abline( aes(intercept = coef(fit)[1], slope = coef(fit)[2], color='red'), size=1 )
+
+fit <- rq(foodexp ~ income, tau=.5, data=engel, method="br")
+
+plt = plt + geom_abline( aes_string(intercept = coef(fit)[1], slope = coef(fit)[2], color='blue') )
+plt = plt + geom_abline( aes_string(intercept = coef(fit)[1], slope = coef(fit)[2]) )
 
 plt        
+
 for( tau in taus){
   print(tau)
   fit <- rq(foodexp ~ income, tau=tau, data=engel, method="br")
