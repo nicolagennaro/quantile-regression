@@ -1,0 +1,164 @@
+---
+title: "Untitled"
+author: "Francesco Pontarin"
+date: "13 giugno 2018"
+output:
+  html_document:
+    self_contained: true
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Video Regressione Quantilica
+
+Knittare per HTML e visualizzare da browser per avere il video embedded altrimenti non so come si fa...
+Necessita di ffmpeg nel pc
+
+Procedura per visualizzare graficamente cosa vuole dire minimizzare la funzione di costo come definita in
+
+https://en.wikipedia.org/wiki/Quantile_regression
+
+attraverso un esempio semplice che cerca il quantile **0.75**.
+
+
+Si vede l'effetto di $\tau$ e $1-\tau$ sulla distribuzione di probabilità nonché il processo di minimizzazione vero e proprio
+assieme al confronto con la differenza tra le aree dei due dominii distinti in cui viene divisa la distribuzione.
+
+Il problema di trovare il minimo è equivalente a trovare il punto in cui la differenza tra le due aree pesate si annulla.
+
+```{r}
+library(animation) 
+library(plyr)
+
+oopt = ani.options(nmax = 150, interval=0.08333, ani.width=800, ani.height=640 )
+
+xmin<- -3
+xmax<- 3
+
+xx<- seq(xmin,xmax,0.05)
+
+pos<-c()
+vals<-c()
+areas<-c()
+
+myplot <-function(xmin,xmax,h,xx,quant,tau,app) {
+  
+  # plot 1 con la distribuzione e l'effetto della tau sulla distribuzione
+  ymin<- -0.1
+  ymax<- 1
+  discr<-qnorm(quant)
+  plot(xx,dnorm(xx), xlim=c(xmin,xmax), ylim=c(ymin,ymax), xlab="u", ylab="density", type="l", lwd=2, col=1)
+  lines(c(xmin,discr),c(1-tau,1-tau), lwd=2, col=2)
+  lines(c(discr,xmax),c(tau,tau), lwd=2, col=3)
+  area1 <- (1-tau)*quant
+  area2 <- (tau)*(1-quant)
+  text(-1.5,0.9,paste("area =", round(area1,digits=3)),col=2,cex=2)
+  text(1.5,0.9,paste("area =",round(area2,digits=3)),col=3,cex=2)
+  
+  absdiff<- abs(area2-area1)
+  text(0,1,paste("absdiff =",round(absdiff,digits=3)),col=1,cex=2)
+  
+  text((xmin+discr)/2,1-tau+0.05,bquote(1- tau == .(round(1-tau,digits=3))),col=2,cex=1.5)
+  text((xmax+discr)/2,tau+0.05,bquote(tau == .(round(tau,digits=3))),col=3,cex=1.5)
+  
+  text(discr,-0.05,paste(round(discr, digits=3)),col=1,cex=1.5)
+  
+  curve(dnorm(x)*(x<=discr)*(1-tau), xlim=c(xmin,discr), ylim=c(ymin,ymax), type="l", lwd=2, col=2,lty=2, add=TRUE)
+  curve(dnorm(x)*(x>=discr)*tau, xlim=c(discr,xmax), ylim=c(ymin,ymax), type="l", lwd=2, col=3,lty=2, add=TRUE)
+  
+  segments(discr,0,discr,tau,lty=2,col=1,lwd=1)
+  abline(h=0,lwd=1)
+  return (c(discr,absdiff))
+  
+}
+
+
+myplot2 <-function(pos,vals,areas) {
+  ymin<- -0.1
+  ymax<- 1.75
+  xmin<- -3
+  xmax<- 3
+  
+  #plot 2 con i valori della funzione di costo e differenza tra le aree
+  plot(pos,vals, xlim=c(xmin,xmax), ylim=c(ymin,ymax), xlab="u", ylab="value", type="l", lwd=2, col=2)
+  lines(pos,areas, xlim=c(xmin,xmax), ylim=c(ymin,ymax), type="l", lwd=2, col=1)
+  legend(x= "topright", y=1, legend=c("Abs diff of the areas", expression("Loss function " ~ E* "[" ~rho[tau] (Y-u)~"]") ),
+       col=c(2, 1), lwd=c(2,2), lty=c(1,1), cex=1.5)
+  abline(h=0,lwd=1)
+}
+
+
+saveVideo({
+  
+for (h in 1:10) {
+  hh<-0
+  quant<-0.5
+  tau<- 0.5
+    
+  par(mfrow=c(2,1),mar=c(5, 4, 1, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  myplot(xmin,xmax,hh,xx,quant,tau,FALSE)
+  myplot2(0,0,0)
+
+  ani.pause()
+}
+  
+for (h in 1:70) {
+  if (h<=41) {
+    hh<-h
+  } else {
+    hh<-41
+  }
+  quant<-0.5
+  tau<- 0.5+(0.00625*(hh-1))
+    
+  par(mfrow=c(2,1),mar=c(5, 4, 1, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  myplot(xmin,xmax,hh,xx,quant,tau,FALSE)
+  myplot2(0,0,0)
+
+  ani.pause()
+}
+
+for (h in 1:100) {
+  if (h<=79) {
+    hh<-h
+  } else {
+    hh<-79
+  }
+  quant <- 0.0125+0.0125*(hh-1)
+  tau<- 0.75
+  
+  par(mfrow=c(2,1),mar=c(5, 4, 1, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  vv<-myplot(xmin,xmax,hh,xx,quant,tau,TRUE)
+  dd<-vv[1]
+  pos<-append(pos,dd)
+  vals<-append(vals,vv[2])
+
+  curarea<- (tau-1)*(-dnorm(dd) -dd*pnorm(dd)) + tau*(dnorm(-dd)-dd*pnorm(-dd))
+  areas<-append(areas,curarea)
+  myplot2(pos,vals,areas)
+  
+  idx<-which.min(vals)
+
+  segments(pos[idx],0,pos[idx],areas[idx],col=3,lwd=2)
+  segments(pos[idx],0,pos[idx],vals[idx],col=3,lwd=2)
+  points(pos[idx],areas[idx],col=2,lwd=4)
+  points(pos[idx],vals[idx],col=2,lwd=4)
+  text(pos[idx],-0.06,paste(round(pos[idx], digits=3)),col=1,cex=1.5)
+  text(pos[idx],areas[idx]+0.1,paste(round(areas[idx], digits=3)),col=1,cex=1.5)
+  
+  ani.pause()
+}
+
+}, video.name = "quant.mp4")
+
+```
+<video controls loop autoplay>
+  <source src= "quant.mp4" type="video/mp4">
+</video>
+```{r eval = FALSE}
+
+ani.options(oopt)
+```
