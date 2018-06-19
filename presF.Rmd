@@ -21,8 +21,6 @@ output:
 ```{r setup, include=FALSE}
 library(MASS)
 library(quantreg)
-library(rgl)
-library(rglwidget)
 library(grid)
 library(gridBase)
 library(ggplot2)
@@ -58,9 +56,7 @@ knitr::knit_hooks$set(output = function(x, options) {
   # paste these lines together
   x <- paste(c(x, ""), collapse = "\n")
   hook_output(x, options)
-}) 
-
-knitr::knit_hooks$set(webgl = hook_webgl)
+})
 
 ```
 
@@ -148,7 +144,7 @@ The concept is generalized to allow its use with distributions coming from obser
 
 ## A visual hint
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, eval=FALSE, results='hide',message=FALSE}
 library(animation) 
 library(plyr)
 
