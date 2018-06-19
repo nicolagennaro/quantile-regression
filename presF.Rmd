@@ -1,0 +1,469 @@
+---
+title: "Quantile Regression with `quantreg`"
+author: "N. Gennaro - F. Pontarin"
+date: "28 giugno 2018"
+header-includes:
+  - \usepackage{bm}
+output:
+  beamer_presentation:
+    keep_tex: true
+    latex_engine: xelatex
+    toc: yes
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+  ioslides_presentation:
+    toc: yes
+  slidy_presentation:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+library(MASS)
+library(quantreg)
+library(rgl)
+library(rglwidget)
+library(grid)
+library(gridBase)
+library(ggplot2)
+
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+
+
+hook_output <- knitr::knit_hooks$get("output")
+knitr::knit_hooks$set(output = function(x, options) {
+  lines <- options$output.lines
+  if (is.null(lines)) {
+    return(hook_output(x, options))  # pass to default hook
+  }
+  x <- unlist(strsplit(x, "\n"))
+  more <- "..."
+  if (length(lines)==1) {        # first n lines
+    if (length(x) > lines) {
+      # truncate the output, but add ....
+      x <- c(head(x, lines), more)
+    }
+  } else {
+    x <- c(if (abs(lines[1])>1 | lines[1]<0) more else NULL,
+           x[lines],
+           if (length(x)>lines[abs(length(lines))]) more else NULL
+          )
+  }
+  # paste these lines together
+  x <- paste(c(x, ""), collapse = "\n")
+  hook_output(x, options)
+}) 
+
+knitr::knit_hooks$set(webgl = hook_webgl)
+
+```
+
+# A bit of Theory
+
+## Expanding the usual approach
+
+The objective of linear regression analysis is the estimation of the *mean*.
+
+Quantile Regression aims at estimating specific *quantiles* (e.g. median)
+
+
+## Expanding the usual approach
+```{r echo=FALSE, fi}
+data(engel)
+plot(foodexp ~ income, data = engel,
+main = "Engel data", xlab ="Income", ylab="Food Expenditure", pch='*', pin=c(2,1))
+taus <- c(.05, .25, .50, .75, .95)
+
+rqs <- as.list(taus)
+
+for(i in seq(along = taus)) {
+rqs[[i]] <- rq(foodexp ~ income, tau = taus[i], data = engel)
+  if (taus[i]==0.50){
+    abline(rqs[[i]],col=i+1,lty=1,lwd=3)
+  } else {
+    abline(rqs[[i]],col=i+1,lty=3,lwd=3)
+  }
+}
+
+lr<-lm(foodexp ~ income, data = engel)
+abline(lr,col=8,lty=2,lwd=4)
+#lines(engel$income, fitted(lr), col = 8, lwd=1.5, lty=2)
+legend("bottomright",1, legend= c(paste(taus, " quantile"),"mean"),title="Est. quantities",
+  col = c((2:(length(taus)+1)),8), lty=c(3,3,1,3,3,2), lwd=c(rep(3,length(taus)),4))
+```
+
+## Expanding the usual approach
+
+- Linear regression is supported by a number of assumptions about the predictor variables, the response variables and their relationship (error independence, homoscedasticity,... )
+
+The structure underlying this type problems allow them to be transformed into linear algebra equivalents
+
+- On the other hand, Quantile regression makes no particular assumption on the distribution of the response nor about its variance
+
+This leads instead to linear programming problems
+
+## Expanding the usual approach
+
+| Linear Regression               | Quantile Regression             |
+| :-----------------------------: | :-----------------------------: |
+| Predicts the mean               | Predicts conditional quantiles  |
+| Applies when n is small         | Needs sufficient data           | 
+| Often assumes normality         | Is distribution agnostic        | 
+| Is sensitive to outliers        | Is robust to response outliers  |
+| Is computationally inexpensive  | Is computationally intensive    |
+
+
+Table: A quick comparison between the two regressions
+
+
+## Under the hood
+
+Called $\tau$ the objective quantile of a random variable $Y$, Quantile regression minimizes a sum that gives asymmetric penalties:
+
+- $(\tau -1) e_i$ for underestimates
+
+- $\tau e_i$ for overestimates
+
+This is condensed in what's defined as the *loss function*
+
+$$
+\rho_\tau(y) =  (\tau- 1_{ \{y<0\} }) y
+$$
+
+## Under the hood
+
+The wanted quantile $u$ can be calculated by minimizing the expected loss for $Y-u$ that is
+
+$$
+E [\rho_\tau(Y-u)] = (\tau-1)\int_{-\infty}^u {(y-u) dF_Y(y)} + \tau \int_u^{+\infty} (y-u) dF_Y(y)
+$$
+
+The concept is generalized to allow its use with distributions coming from observed samples
+
+## A visual hint
+
+```{r echo=FALSE, results='hide',message=FALSE}
+library(animation) 
+library(plyr)
+
+oopt = ani.options(nmax = 150, interval=0.08333, ani.width=800, ani.height=500 )
+
+xmin<- -3
+xmax<- 3
+
+xx<- seq(xmin,xmax,0.05)
+
+pos<-c()
+vals<-c()
+areas<-c()
+
+myplot <-function(xmin,xmax,h,xx,quant,tau,app) {
+  
+  # plot 1 con la distribuzione e l'effetto della tau sulla distribuzione
+  ymin<- -0.1
+  ymax<- 1
+  discr<-qnorm(quant)
+  plot(xx,dnorm(xx), xlim=c(xmin,xmax), ylim=c(ymin,ymax), xlab="u", ylab="density", type="l", lwd=2, col=1)
+  lines(c(xmin,discr),c(1-tau,1-tau), lwd=2, col=2)
+  lines(c(discr,xmax),c(tau,tau), lwd=2, col=3)
+  area1 <- (1-tau)*quant
+  area2 <- (tau)*(1-quant)
+  text(-1.5,0.9,paste("area =", round(area1,digits=3)),col=2,cex=1.5)
+  text(1.5,0.9,paste("area =",round(area2,digits=3)),col=3,cex=1.5)
+  
+  absdiff<- abs(area2-area1)
+  text(0,0.95,paste("absdiff =",round(absdiff,digits=3)),col=1,cex=2)
+  
+  text((xmin+discr)/2,1-tau+0.06,bquote(1- tau == .(round(1-tau,digits=3))),col=2,cex=1.25)
+  text((xmax+discr)/2,tau+0.06,bquote(tau == .(round(tau,digits=3))),col=3,cex=1.25)
+  
+  text(discr,-0.05,paste(round(discr, digits=3)),col=1,cex=1.5)
+  
+  curve(dnorm(x)*(x<=discr)*(1-tau), xlim=c(xmin,discr), ylim=c(ymin,ymax), type="l", lwd=2, col=2,lty=2, add=TRUE)
+  curve(dnorm(x)*(x>=discr)*tau, xlim=c(discr,xmax), ylim=c(ymin,ymax), type="l", lwd=2, col=3,lty=2, add=TRUE)
+  
+  segments(discr,0,discr,tau,lty=2,col=1,lwd=1)
+  abline(h=0,lwd=1)
+  return (c(discr,absdiff))
+  
+}
+
+
+myplot2 <-function(pos,vals,areas) {
+  ymin<- -0.1
+  ymax<- 1.75
+  xmin<- -3
+  xmax<- 3
+  
+  #plot 2 con i valori della funzione di costo e differenza tra le aree
+  plot(pos,vals, xlim=c(xmin,xmax), ylim=c(ymin,ymax), xlab="u", ylab="value", type="l", lwd=2, col=2)
+  lines(pos,areas, xlim=c(xmin,xmax), ylim=c(ymin,ymax), type="l", lwd=2, col=1)
+  legend(x= "topright", y=1, legend=c("Abs diff of the areas", expression("Loss function " ~ E* "[" ~rho[tau] (Y-u)~"]") ),
+       col=c(2, 1), lwd=c(2,2), lty=c(1,1), cex=1.5)
+  abline(h=0,lwd=1)
+}
+
+
+saveVideo({
+  
+for (h in 1:10) {
+  hh<-0
+  quant<-0.5
+  tau<- 0.5
+    
+  par(mfrow=c(2,1),mar=c(5, 4, 0, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  myplot(xmin,xmax,hh,xx,quant,tau,FALSE)
+  myplot2(0,0,0)
+
+  ani.pause()
+}
+  
+for (h in 1:70) {
+  if (h<=41) {
+    hh<-h
+  } else {
+    hh<-41
+  }
+  quant<-0.5
+  tau<- 0.5+(0.00625*(hh-1))
+    
+  par(mfrow=c(2,1),mar=c(5, 4, 0, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  myplot(xmin,xmax,hh,xx,quant,tau,FALSE)
+  myplot2(0,0,0)
+
+  ani.pause()
+}
+
+for (h in 1:100) {
+  if (h<=79) {
+    hh<-h
+  } else {
+    hh<-79
+  }
+  quant <- 0.0125+0.0125*(hh-1)
+  tau<- 0.75
+  
+  par(mfrow=c(2,1),mar=c(5, 4, 0, 1.5) + 0.1, cex.axis=1.5, cex.lab=1.5)
+  vv<-myplot(xmin,xmax,hh,xx,quant,tau,TRUE)
+  dd<-vv[1]
+  pos<-append(pos,dd)
+  vals<-append(vals,vv[2])
+
+  curarea<- (tau-1)*(-dnorm(dd) -dd*pnorm(dd)) + tau*(dnorm(-dd)-dd*pnorm(-dd))
+  areas<-append(areas,curarea)
+  myplot2(pos,vals,areas)
+  
+  idx<-which.min(vals)
+
+  segments(pos[idx],0,pos[idx],areas[idx],col=3,lwd=2)
+  segments(pos[idx],0,pos[idx],vals[idx],col=3,lwd=2)
+  points(pos[idx],areas[idx],col=2,lwd=4)
+  points(pos[idx],vals[idx],col=2,lwd=4)
+  text(pos[idx],-0.07,paste(round(pos[idx], digits=3)),col=1,cex=1.5)
+  text(pos[idx],areas[idx]+0.2,paste(round(areas[idx], digits=3)),col=1,cex=1.5)
+  
+  ani.pause()
+}
+
+}, video.name = "quant.mp4")
+ani.options(oopt)
+```
+<video controls loop autoplay>
+  <source src= "quant.mp4" type="video/mp4">
+</video>
+
+
+# The package `quantreg`
+
+# The dataset
+
+# Some Examples
+
+
+##
+
+to perform a Quantile regression one can call:
+
+```{ size="small"}
+rq(formula, tau=.5, data, subset, weights, na.action,
+   method="br", model = TRUE, contrasts, ...)
+```
+
+So for example:
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE, size="small"}
+taus <- c(.05,.1,.25,.50,.75,.90,.95)
+for( i in 1:length(taus)){
+  current.rq<- rq( median_house_value ~ median_income,
+             data=house,tau=taus[i])
+  abline(current.rq)
+}
+```
+
+##
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+house <- read.csv("house_from_gitsklearn.csv")
+
+par(mar=c(4,5,0,1))
+plot(house$median_income, house$median_house_value, cex=.25, cex.lab=1,cex.axis=1,
+     lheight=0.5,
+     xlab="Median Income", ylab="Median House Value")
+
+taus <- c(.05,.1,.25,.75,.90,.95)
+for( i in 1:length(taus)){
+  abline(rq( median_house_value ~ median_income,
+             data=house,tau=taus[i]), col="green3", lwd=2)
+}
+
+median.rq<-rq( median_house_value ~ median_income,
+             data=house,tau=0.5)
+abline(median.rq, col=4, lwd=2)
+
+
+fit <- lm( median_house_value ~ median_income + (median_income*median_income), data=house )
+abline(fit,col=2, lwd=2, lty =2 )
+
+```
+
+##
+
+With the result given by `rq` one can print the summary with the function `summary.rqs`
+
+```{ size="small"}
+summary.rqs(object, se = NULL, covariance=FALSE,
+            hs = TRUE,  U = NULL, gamma = 0.7, ...)
+```
+
+the coefficients for each requested quantiles are shown
+
+```{r warning=FALSE, size="small",  output.lines=10}
+population.rq<- rq(population ~ households,
+                   data=house, tau=taus)
+population.summary<-summary.rqs(population.rq, ci='boot')
+population.summary
+```
+
+
+##
+
+One can plot the summary with the following command:
+
+
+```{ size="small"}
+plot.summary.rs(x, parm = NULL, level = 0.9, ols = TRUE,
+  mfrow = NULL, mar = NULL, ylim = NULL, main = NULL,
+  col = gray(c(0, 0.75)), border = NULL, lcol = 2,
+  lty = 1:2, cex = 0.5, pch = 20, type = "b", xlab = "",
+  ylab = "", ...)
+```
+
+
+The coefficients for each requested quantiles are plotted together with their confidence intervals.
+
+
+##
+```{r size="small"}
+plot.summary.rqs(population.summary)
+```
+
+##
+
+`rqss` fits additive quantile regression models with possible univariate and/or bivariate
+nonparametric terms.
+
+
+```
+rqss(formula, tau = 0.5, data = parent.frame(), weights,
+     na.action, method = "sfn", lambda = NULL,
+     contrasts = NULL, ztol = 1e-5, control, ...)
+```
+
+
+```{r warning=FALSE, message=FALSE, size="small"}
+fhouse<-house
+fhouse$longitude <- round(fhouse$longitude * 100)
+fhouse$latitude <- round(fhouse$latitude * 100)
+fit <- rqss(median_house_value ~ qss(cbind(longitude,latitude),
+                                     lambda = 8),
+            data = fhouse)
+```
+
+##
+
+The resulting fit can be plotted with the function `plot.rqss`
+
+```{r eval=F, size="tiny"}
+
+plot.new() 
+
+gl <- grid.layout(nrow=1, ncol=2)
+vp.1 <- viewport(layout.pos.col=1, layout.pos.row=1) 
+vp.2 <- viewport(layout.pos.col=2, layout.pos.row=1) 
+
+pushViewport(viewport(layout=gl))
+pushViewport(vp.1)
+
+par(new=TRUE, fig=gridFIG())
+plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
+          render="contour")
+popViewport()
+
+pushViewport(vp.2)
+ggplotted <- ggplot(house) + geom_point(
+  mapping=aes(x=longitude, y=latitude,
+              col=median_house_value)) +
+  scale_color_gradientn("median\nhouse value",
+                        colours = rainbow(7)) +
+  theme(legend.position = c(.8, .8))
+print(ggplotted, newpage = FALSE)
+
+popViewport(1)
+
+```
+
+##
+
+```{r echo=F,warning=FALSE, message=FALSE, size="small"}
+
+plot.new() 
+
+gl <- grid.layout(nrow=1, ncol=2)
+vp.1 <- viewport(layout.pos.col=1, layout.pos.row=1) 
+vp.2 <- viewport(layout.pos.col=2, layout.pos.row=1) 
+
+pushViewport(viewport(layout=gl))
+pushViewport(vp.1)
+
+par(new=TRUE, fig=gridFIG())
+plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
+          render="contour")
+popViewport()
+
+pushViewport(vp.2)
+ggplotted <- ggplot(house) + geom_point(
+  mapping=aes(x=longitude, y=latitude,
+              col=median_house_value)) +
+  scale_color_gradientn("median\nhouse value",
+                        colours = rainbow(7)) +
+  theme(legend.position = c(.8, .8))
+print(ggplotted, newpage = FALSE)
+
+popViewport(1)
+
+```
+
+
+```{r echo=FALSE, eval=FALSE, warning=FALSE, message=FALSE, fig.height=6, size="small"}
+
+par(mfrow=c(1,2))
+plot(house$longitude,house$latitude)
+plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
+          render="contour")
+```
+
+
