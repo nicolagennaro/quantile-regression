@@ -270,9 +270,6 @@ for (h in 1:100) {
 }, video.name = "quant.mp4")
 ani.options(oopt)
 ```
-<video controls loop autoplay>
-  <source src= "quant.mp4" type="video/mp4">
-</video>
 
 
 # The package `quantreg`
