@@ -1,0 +1,177 @@
+
+
+
+1 - quantile regression
+
+In the linear regression setting we saw how to estimate the conditional mean of the response variable
+given some predictor variables, QR instead, aims at estimating the conditional quantile of the response.
+In fact it's a sort of extension of this technique to quantiles and is preferable when the conditions for 
+Linear regression are not satisfied or in all those cases where someone is interested in the quantiles of 
+the distribution. 
+QR tells us more information than the simple linear regression 
+for the mean, for example, from this kind of analysis
+we can better deduce the trend of the distribution, for example if it tends to enlarge as the 
+covariate increse.
+
+
+
+
+2 - example from R built in dataset
+
+The QR lines shows that the dispersion of the response variable tends to increase as the predictor(covariates) 
+increases.  But it also shows that the conditional distribution is (asymmetric) and skewed to the left, this
+is evident by the spreading of the bottom lines but can be inferred also from the position of the conditional
+mean and the conditional median.
+
+
+
+3 - 
+
+
+
+
+
+
+
+8 - Dataset
+
+for the examples we used the California Hosing Data, which contains informations from the census of the 
+california districts. This dataset is composed of continuos and factor variables, and contains information 
+like geographical position, population and house features. The variable we want to predict is the median house 
+value.
+Since the range of values of different columns are very different, to make the analysis more readable, we scaled 
+all the variables of the dataset to the (0, 1) interval.
+We also cleaned this dataset removing all rows with Not Available entries. Another problem is the fact that 
+some variables like median_house_value are capped, i.e. their values are limited by some upper limit, to avoid
+anormalities in the regression we decided to eliminate those data.
+
+
+
+9 - quantreg package
+
+R provides an entire package for quantile regression: the 'quantreg' package ...
+
+
+
+10 - rq
+
+the core function of this package is the rq function, which is the equivalent of lm but for QR. In fact the
+sintax is the same: the function takes a formula specifying the predicted and the covariates, a number in the 
+(0,1) interval or a whole vector of probabilities, for computing more regression quantile lines in a single call.
+The confidence intervals for the coefficients can be estimated using for example the bootstrap method, or others
+and also the algorithm for computing them can be specified. "br" is the one we have described before, the others
+should be used for large datasets.
+
+
+the function returns an object containing all the informations about the fit: this can be examined using the
+summary.rq function. Like for linear regression this shows the estimated coeff, their Std Err, and also the
+significance level for the null hypothesis, (coeff = 0). (the F test is based on alymptotical normality of data
+see Koenker Bassett 1978)
+
+
+
+
+11 - plot.summary.rqs
+
+the summary can also be plotted in this way using the plot.summary.rqs utility. In the picture we can see the
+estimated coeff for each quantile, with his confidence interval. The red line represent the coeff for the 
+simple linear regression, together with his error. Some useful informations can be from this kind of plot:
+
+
+
+
+maybe 2 different patterns: up and down, heteroskedasticity
+
+
+the rq function is able to deal also with factor variables, like for LM the factors are encoded using
+0s and 1s and the coefficient simply shows how the slope of the line changes when the observation
+belongs to a certain class.
+
+
+
+
+example
+maybe all variables, the 
+
+
+
+12 - anova for parallel lines
+
+qunatreg provides also the anova.rq function that can be used in two differet forms:
+when the fit is performed for a vector of quantiles the function perform a test on the hypothesis that
+all the coefficients are the same. 
+Example median income - house value, 
+as we can see the p-value is small so the lines are not parallel, again as mentioned before this is due 
+to the heteroskedasticity of the data. So this is nothing but a test for homosked.
+
+
+ANOVA on coeff. for same covariates but different quantiles is nothing but a test on heteroskedasticity of data.
+
+
+13 - anova for nested models
+
+
+the second functionality of the anova function is, like for LR, to compare nested models.
+
+same p value ??
+
+
+
+14 - boot
+
+another function provided is the boot.rq function, which is used also internally to compute the confidence 
+intervals.
+It's nothing special, it just simplify the job for performing bootstrap-based analysis of the coefficients.
+But we used it here to show another important aspect of QR, the fact that the asympotical distribution of
+the estim coeff is gaussian, all the test performed for example by the summary or anova function are based
+on this hypothesis.
+In this figure we can see the distrib for the coeff using a synthetic dataset, as we can see as the number
+of points grows the distribution gets closer to the bell shape curve.
+
+
+asymptotic distribution see Koenker Bassett 1978 pag 11, 12
+
+
+
+
+
+
+ - rqss
+
+
+
+
+
+
+ - lprq
+ 
+ this is a simple function to perform local interpolation for quantiles. The function divides
+ the interval in a certain number of smaller intervals, then for each of them a regression line
+ is computed using the whole dataset but weighting all the observations with a gaussian term.
+ This term is a gaussian density centered on the current point and with a variance that is
+ proportional to the inverse of the h parameter.
+ In this way the observations closer to the current interval have an higher weight, while the
+ ones outside get a lower one. By this procedure the final result is a sort of smooth 
+ function composed by many join segments, useful when the data pattern is far from linear. 
+
+
+
+
+
+ - nlrq
+
+
+
+
+
+
+
+
+
+
+
+
+
+ADD 
+
+lasso in rq
