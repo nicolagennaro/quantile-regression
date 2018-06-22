@@ -64,9 +64,11 @@ knitr::knit_hooks$set(output = function(x, options) {
 
 ## Expanding the usual approach
 
-The objective of linear regression analysis is the estimation of the *mean*.
+The objective of linear regression analysis is the estimation of the conditional *mean*
 
-Quantile Regression aims at estimating specific *quantiles* (e.g. median)
+Quantile Regression aims at estimating specific conditional *quantiles* (e.g. median)
+
+It was introduced by Roger Koenker and Gilbert Bassett: "Regression Quantiles", *Econometrica*, 46, 33-50 (1978)
 
 
 ## Expanding the usual approach
@@ -272,14 +274,68 @@ ani.options(oopt)
 ```
 
 
-# The package `quantreg`
-
 # The dataset
+
+## California Housing Data
+
+This dataset found on Kaggle gathers information from the census of the 
+Californian districts.
+
+It contains about 20600 observations of many different variables:
+
+```{r echo=TRUE, size="tiny"}
+house <- read.csv("house_from_gitsklearn.csv")
+summary(house)
+```
+
+
+## Cleaning the dataset
+
+```{r echo=FALSE}
+
+par(mfrow=c(1,2))
+
+plot(house$median_income, house$median_house_value, cex=.25, cex.lab=1,cex.axis=1,
+     lheight=0.5,
+     xlab="Median Income", ylab="Median House Value")
+
+house <- house[ complete.cases(house), ]
+
+to_scale <- c("median_house_value", "median_income", "households", "population", "total_bedrooms", "total_rooms", "housing_median_age", "latitude", "longitude")
+
+for( str in to_scale){
+  house[str] = ((house[str]) - min(house[str])) /
+    ( max(house[str]) - min(house[str]) )
+}
+
+house <- house[ -which(house$median_house_value == 1), ]
+
+plot(house$median_income, house$median_house_value, cex=.25, cex.lab=1,cex.axis=1,
+     lheight=0.5,
+     xlab="Median Income", ylab="Median House Value")
+
+```
+
+
+
+# The package
+
+## `quantreg`
+
+The R-package `quantreg` provides the estimation and inference methods for models of conditional quantiles
+
+It was written by Roger Koenker
+
+
+```{r echo=TRUE, eval=FALSE}
+library(quantreg)
+```
+
 
 # Some Examples
 
 
-##
+## The function `rq`
 
 to perform a Quantile regression one can call:
 
@@ -287,6 +343,7 @@ to perform a Quantile regression one can call:
 rq(formula, tau=.5, data, subset, weights, na.action,
    method="br", model = TRUE, contrasts, ...)
 ```
+
 
 So for example:
 ```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE, size="small"}
@@ -301,8 +358,6 @@ for( i in 1:length(taus)){
 ##
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-house <- read.csv("house_from_gitsklearn.csv")
 
 par(mar=c(4,5,0,1))
 plot(house$median_income, house$median_house_value, cex=.25, cex.lab=1,cex.axis=1,
@@ -325,18 +380,18 @@ abline(fit,col=2, lwd=2, lty =2 )
 
 ```
 
-##
+## The function `summary.rqs`
 
 With the result given by `rq` one can print the summary with the function `summary.rqs`
 
-```{ size="small"}
+```{ size="tiny"}
 summary.rqs(object, se = NULL, covariance=FALSE,
             hs = TRUE,  U = NULL, gamma = 0.7, ...)
 ```
 
 the coefficients for each requested quantiles are shown
 
-```{r warning=FALSE, size="small",  output.lines=10}
+```{r warning=FALSE, size="tiny",  output.lines=10}
 population.rq<- rq(population ~ households,
                    data=house, tau=taus)
 population.summary<-summary.rqs(population.rq, ci='boot')
@@ -344,13 +399,13 @@ population.summary
 ```
 
 
-##
+## The function `plot.summary.rqs`
 
 One can plot the summary with the following command:
 
 
 ```{ size="small"}
-plot.summary.rs(x, parm = NULL, level = 0.9, ols = TRUE,
+plot.summary.rqs(x, parm = NULL, level = 0.9, ols = TRUE,
   mfrow = NULL, mar = NULL, ylim = NULL, main = NULL,
   col = gray(c(0, 0.75)), border = NULL, lcol = 2,
   lty = 1:2, cex = 0.5, pch = 20, type = "b", xlab = "",
@@ -362,11 +417,149 @@ The coefficients for each requested quantiles are plotted together with their co
 
 
 ##
-```{r size="small"}
+
+```{r size="tiny"}
 plot.summary.rqs(population.summary)
 ```
 
+## The function `anova.rq`
+
+It is possible to perform the Anova of rq objects.
+
+`anova.rq` comes in two forms:
+
+1. when the fit is performed for a vector of quantiles the function perform a test on the hypothesis that
+all the coefficients are the same
+
+2. compare nested models as in linear regression
+
+## `anova.rq` compare slopes
+
+```{r echo=FALSE}
+taus <- c(.05, .10, .25, .50, .75, .90, .95)
+fit <- rq( median_house_value ~ median_income, tau=taus, data=house )
+```
+
+```{r echo=TRUE, size="tiny"}
+anova.rqs(fit)
+```
+
+The results show indeed that it is unlikely that the lines have the same slope
+
+## `anova.rq` nested models
+
+```{r echo=TRUE, size="tiny"}
+fit.1 <- rq(median_house_value ~ median_income, tau=0.5, data=house)
+fit.2 <- rq(median_house_value ~ median_income + total_rooms,
+            tau=0.5, data=house)
+fit.3 <- rq(median_house_value ~ median_income + total_bedrooms,
+            tau=0.5, data=house)
+
+anova.rq(fit.1, fit.2)
+anova.rq(fit.1, fit.3)
+```
+
+The results shows that the additional covariate `total_rooms` is not significant while the `total_bedrooms` covariate does improve significantly the prediction
+
+
+## The function `predict.rq`
+
+`quantreg` gives also the possibility to predict the quantiles given the fit
+
+```{r echo=TRUE}
+newdata <- house[3,]
+yy<-predict.rq(object=fit.1,newdata=newdata,type="none", 
+               stepfun = FALSE)
+yy
+```
+
+
+## The function `boot.rq`
+
+```{r echo=TRUE, eval=FALSE}
+set.seed(4)
+ns <- c(10, 12, 14)
+  
+par(mfrow = c(1, length(ns)))
+for( i in ns ){
+  n <- (2^i)+1
+  x <- seq(0, 2, length=n);  y <- -x + rnorm(n)
+  df <- data.frame(x, y)
+  b <- boot.rq(x=x, y=y, tau=.5, R = 1000)
+  main <- paste(n, "Points")
+  m <- mean(b$B) + 1;  s <- sd(b$B)
+  hist(b$B + 1, breaks = 30, prob=TRUE,
+       xlab = "B* - B", main = main)
+  abline(v=0, add=TRUE, col='red', lty=2, lwd=2)
+  abline(v=m, add=TRUE, col='green', lty=2, lwd=2)
+  curve(dnorm(x, m, s), add=TRUE)
+}
+
+```
+
 ##
+
+```{r echo=FALSE, eval=TRUE}
+set.seed(4)
+ns <- c(10, 12, 14)
+  
+par(mfrow = c(1, length(ns)))
+for( i in ns ){
+  n <- (2^i)+1
+  x <- seq(0, 2, length=n)
+  y <- -x + rnorm(n)
+  df <- data.frame(x, y)
+  b <- boot.rq(x=x, y=y, tau=.5, R = 1000)
+  main <- paste(n, "Points")
+  m <- mean(b$B) + 1
+  s <- sd(b$B)
+  hist(b$B + 1, breaks = 30, prob=TRUE, xlab = "B* - B", main = main)
+  abline(v=0, add=TRUE, col='red', lty=2, lwd=2)
+  abline(v=m, add=TRUE, col='green', lty=2, lwd=2)
+  curve(dnorm(x, m, s), add=TRUE)
+}
+
+```
+
+## The function `lprq`
+
+This function does locally polynomial quantile regression univariate smoothing
+
+```{r echo=TRUE, eval=FALSE}
+
+plot(house$longitude, house$median_house_value,
+     xlab="Longitude", ylab="Median House Value",
+     cex=.25, cex.lab=1,cex.axis=1, lheight=0.5)
+for(tau in taus){
+  fit <- lprq(house$longitude, house$median_house_value,
+              tau=tau, h=0.1, m=50)
+  if( tau == 0.5){
+    lines(fit$xx, fit$fv, col="4", lwd=2)
+  }
+  else{
+    lines(fit$xx, fit$fv, col="green3", lwd=2)
+  }
+}
+```
+
+##
+
+```{r echo=FALSE,eval=TRUE}
+plot(house$longitude, house$median_house_value, xlab="Longitude", ylab="Median House Value", cex=.25, cex.lab=1,cex.axis=1, lheight=0.5)
+
+for(tau in taus){
+  fit <- lprq(house$longitude, house$median_house_value, h=0.1, tau=tau, m=50)
+  if( tau == 0.5){
+    lines(fit$xx, fit$fv, col="4", lwd=2)
+  }
+  else{
+    lines(fit$xx, fit$fv, col="green3", lwd=2)
+  }
+}
+```
+
+
+## The function `rqss`
 
 `rqss` fits additive quantile regression models with possible univariate and/or bivariate
 nonparametric terms.
@@ -383,9 +576,8 @@ rqss(formula, tau = 0.5, data = parent.frame(), weights,
 fhouse<-house
 fhouse$longitude <- round(fhouse$longitude * 100)
 fhouse$latitude <- round(fhouse$latitude * 100)
-fhouse$median_house_value <- log10(fhouse$median_house_value)
 fit <- rqss(median_house_value ~ qss(cbind(longitude,latitude),
-                                     lambda = 8),
+                                     lambda = 5),
             data = fhouse)
 ```
 
@@ -410,7 +602,7 @@ plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
 popViewport()
 
 pushViewport(vp.2)
-ggplotted <- ggplot(house) + geom_point(
+ggplotted <- ggplot(fhouse) + geom_point(
   mapping=aes(x=longitude, y=latitude,
               col=median_house_value)) +
   scale_color_gradientn("median\nhouse value",
@@ -441,7 +633,7 @@ plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
 popViewport()
 
 pushViewport(vp.2)
-ggplotted <- ggplot(house) + geom_point(
+ggplotted <- ggplot(fhouse) + geom_point(
   mapping=aes(x=longitude, y=latitude,
               col=median_house_value)) +
   scale_color_gradientn("median\nhouse value",
@@ -457,7 +649,7 @@ popViewport(1)
 ```{r echo=FALSE, eval=FALSE, warning=FALSE, message=FALSE, fig.height=6, size="small"}
 
 par(mfrow=c(1,2))
-plot(house$longitude,house$latitude)
+plot(fhouse$longitude,house$latitude)
 plot.rqss(fit, axes = FALSE, xlab = "", ylab = "",
           render="contour")
 ```
@@ -471,35 +663,42 @@ predict.rqss(object, newdata, interval = "none",
              level = 0.95, ...)
 ```
 
-```{r eval=FALSE, size="small"}
-newdata<-fhouse[c("longitude","latitude")]
-newdata$median_house_value<-exp(
-  predict.rqss(fit, newdata=newdata,
-               interval = "none", level = 0.50))
-newdata$longitude <- newdata$longitude / 100
-newdata$latitude <- newdata$latitude / 100
-
-ggplot(newdata) + geom_point(
-  mapping=aes(x=longitude, y=latitude,
-              col=median_house_value)) +
-  scale_color_gradientn("median\nhouse value",
-                        colours = rainbow(7)) +
-  theme(legend.position = c(.8, .8))
+```{r eval=TRUE, size="small"}
+newdata1<-fhouse[c("longitude","latitude")]
+newdata1$median_house_value<-
+  predict.rqss(fit, newdata=newdata1, interval="none")
 ```
 
 ##
 
-```{r echo=FALSE}
-newdata<-fhouse[c("longitude","latitude")]
-newdata$median_house_value<-exp(predict.rqss(fit, newdata=newdata, interval = "none", level = 0.50))
-newdata$longitude <- newdata$longitude / 100
-newdata$latitude <- newdata$latitude / 100
+```{r echo=FALSE, eval=TRUE}
+plot.new() 
 
-ggplot(newdata) + geom_point(
+gl <- grid.layout(nrow=1, ncol=2)
+vp.1 <- viewport(layout.pos.col=1, layout.pos.row=1) 
+vp.2 <- viewport(layout.pos.col=2, layout.pos.row=1) 
+
+pushViewport(viewport(layout=gl))
+pushViewport(vp.1)
+
+ggplotted <- ggplot(fhouse) + geom_point(
   mapping=aes(x=longitude, y=latitude,
               col=median_house_value)) +
   scale_color_gradientn("median\nhouse value",
                         colours = rainbow(7)) +
   theme(legend.position = c(.8, .8))
+print(ggplotted, newpage = FALSE)
+popViewport()
+
+pushViewport(vp.2)
+ggplotted <- ggplot(newdata1) + geom_point(
+  mapping=aes(x=longitude, y=latitude,
+              col=median_house_value)) +
+  scale_color_gradientn("median\nhouse value",
+                        colours = rainbow(7)) +
+  theme(legend.position = c(.8, .8))
+print(ggplotted, newpage = FALSE)
+
+popViewport(1)
 ```
 
