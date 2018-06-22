@@ -1,8 +1,8 @@
-
-
-
 1 - quantile regression
 
+
+
+Koenker Bassett - 
 In the linear regression setting we saw how to estimate the conditional mean of the response variable
 given some predictor variables, QR instead, aims at estimating the conditional quantile of the response.
 In fact it's a sort of extension of this technique to quantiles and is preferable when the conditions for 
@@ -25,7 +25,7 @@ mean and the conditional median.
 
 
 
-3 - 
+3 - under the hood
 
 
 
@@ -36,7 +36,7 @@ mean and the conditional median.
 8 - Dataset
 
 for the examples we used the California Hosing Data, which contains informations from the census of the 
-california districts. This dataset is composed of continuos and factor variables, and contains information 
+California districts. This dataset is composed of continuos and factor variables, and contains information 
 like geographical position, population and house features. The variable we want to predict is the median house 
 value.
 Since the range of values of different columns are very different, to make the analysis more readable, we scaled 
@@ -58,6 +58,7 @@ R provides an entire package for quantile regression: the 'quantreg' package ...
 the core function of this package is the rq function, which is the equivalent of lm but for QR. In fact the
 sintax is the same: the function takes a formula specifying the predicted and the covariates, a number in the 
 (0,1) interval or a whole vector of probabilities, for computing more regression quantile lines in a single call.
+
 The confidence intervals for the coefficients can be estimated using for example the bootstrap method, or others
 and also the algorithm for computing them can be specified. "br" is the one we have described before, the others
 should be used for large datasets.
@@ -65,12 +66,14 @@ should be used for large datasets.
 
 the function returns an object containing all the informations about the fit: this can be examined using the
 summary.rq function. Like for linear regression this shows the estimated coeff, their Std Err, and also the
-significance level for the null hypothesis, (coeff = 0). (the F test is based on alymptotical normality of data
+significance level for the null hypothesis, (coeff = 0). (the F test is based on asymptotical normality of data
 see Koenker Bassett 1978)
 
 
+10 bis - rq plot of median-median
 
 
+------ N 
 11 - plot.summary.rqs
 
 the summary can also be plotted in this way using the plot.summary.rqs utility. In the picture we can see the
@@ -95,6 +98,12 @@ maybe all variables, the
 
 
 
+11 bis - 
+
+predict function
+
+
+
 12 - anova for parallel lines
 
 qunatreg provides also the anova.rq function that can be used in two differet forms:
@@ -113,10 +122,11 @@ ANOVA on coeff. for same covariates but different quantiles is nothing but a tes
 
 the second functionality of the anova function is, like for LR, to compare nested models.
 
+it's a WALD type test.. Bassettt Koenker 1982
 same p value ??
 
 
-
+------ N 
 14 - boot
 
 another function provided is the boot.rq function, which is used also internally to compute the confidence 
@@ -136,13 +146,13 @@ asymptotic distribution see Koenker Bassett 1978 pag 11, 12
 
 
 
- - rqss
 
 
 
 
 
 
+------ N 
  - lprq
  
  this is a simple function to perform local interpolation for quantiles. The function divides
@@ -156,7 +166,7 @@ asymptotic distribution see Koenker Bassett 1978 pag 11, 12
 
 
 
-
+ - rqss
 
  - nlrq
 
@@ -174,4 +184,15 @@ asymptotic distribution see Koenker Bassett 1978 pag 11, 12
 
 ADD 
 
+fit with factors
+comparison boot intervals, Koenker intervals
+nlrq
 lasso in rq
+
+
+
+
+
+
+N 1-7,  11-13  20-23  26-29
+F 8-10, 14-19  24-25  30-34
