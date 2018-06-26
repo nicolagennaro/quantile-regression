@@ -71,7 +71,8 @@ Quantile Regression aims at estimating specific conditional *quantiles* (e.g. me
 It was introduced by Roger Koenker and Gilbert Bassett: "Regression Quantiles", *Econometrica*, 46, 33-50 (1978)
 
 
-## Expanding the usual approach
+## Example from built-in data
+
 ```{r echo=FALSE, fi}
 data(engel)
 plot(foodexp ~ income, data = engel,
@@ -106,13 +107,13 @@ The structure underlying this type problems allow them to be transformed into li
 
 This leads instead to linear programming problems
 
-## Expanding the usual approach
+## LR-QR comparison
 
 | Linear Regression               | Quantile Regression             |
 | :-----------------------------: | :-----------------------------: |
 | Predicts the mean               | Predicts conditional quantiles  |
 | Applies when n is small         | Needs sufficient data           | 
-| Often assumes normality         | Is distribution agnostic        | 
+| Based on many assumptions       | Is distribution agnostic        | 
 | Is sensitive to outliers        | Is robust to response outliers  |
 | Is computationally inexpensive  | Is computationally intensive    |
 
@@ -134,13 +135,28 @@ $$
 \rho_\tau(y) =  (\tau- 1_{ \{y<0\} }) y
 $$
 
+
+```{r echo=FALSE, eval=TRUE, fig.height=2,fig.width=2, fig.align="center"}
+par(mar=c(5, 4, 2, 2) + 0.1)
+plot(0,0,ylim=c(0,2), xlab="", ylab="")
+segments(0,0,1,2)
+segments(0,0,-2,1)
+abline(h=0)
+text(0.5,1.25,expression(tau))
+text(-0.5,0.65,expression(1-tau))
+```
+
 ## Under the hood
 
 The wanted quantile $u$ can be calculated by minimizing the expected loss for $Y-u$ that is
 
 $$
-E [\rho_\tau(Y-u)] = (\tau-1)\int_{-\infty}^u {(y-u) dF_Y(y)} + \tau \int_u^{+\infty} (y-u) dF_Y(y)
+\begin{aligned}
+& \min_uE [\rho_\tau(Y-u)] = \\
+& = \min_u \Big[ ( \tau-1)\int_{-\infty}^u {(y-u) dF_Y(y)} + \tau \int_u^{+\infty} (y-u) dF_Y(y) \Big]
+\end{aligned}
 $$
+
 
 The concept is generalized to allow its use with distributions coming from observed samples
 
@@ -377,7 +393,8 @@ abline(median.rq, col=4, lwd=2)
 
 fit <- lm( median_house_value ~ median_income + (median_income*median_income), data=house )
 abline(fit,col=2, lwd=2, lty =2 )
-
+legend("bottomright",1, legend= c("quantiles","median","mean"),title="Est. quantities",
+  col = c(3,4,2), lty=c(1,1,2), lwd=c(2,2,2))
 ```
 
 ## The function `summary.rqs`
@@ -419,7 +436,10 @@ The coefficients for each requested quantiles are plotted together with their co
 ##
 
 ```{r size="tiny"}
-plot.summary.rqs(population.summary)
+set.seed(3)
+res.house <- house[ sample(1:nrow(house), 5000), ]
+fit <- rq(median_house_value ~ ., tau=taus, data=res.house)
+plot.summary.rqs(summary.rqs(fit))
 ```
 
 ## The function `anova.rq`
@@ -433,7 +453,7 @@ all the coefficients are the same
 
 2. compare nested models as in linear regression
 
-## `anova.rq` compare slopes
+## `anova.rqs` to compare slopes
 
 ```{r echo=FALSE}
 taus <- c(.05, .10, .25, .50, .75, .90, .95)
@@ -446,7 +466,7 @@ anova.rqs(fit)
 
 The results show indeed that it is unlikely that the lines have the same slope
 
-## `anova.rq` nested models
+## `anova.rq` for nested models
 
 ```{r echo=TRUE, size="tiny"}
 fit.1 <- rq(median_house_value ~ median_income, tau=0.5, data=house)
@@ -495,6 +515,9 @@ for( i in ns ){
   curve(dnorm(x, m, s), add=TRUE)
 }
 
+legend("topright", 1, legend = c("real mean","sample mean"), col = c("red", "green"),
+       lty=c(2,2), lwd=c(2,2))
+
 ```
 
 ##
@@ -519,11 +542,14 @@ for( i in ns ){
   curve(dnorm(x, m, s), add=TRUE)
 }
 
+legend("topright", 1, legend = c("real mean","sample mean"), col = c("red", "green"),
+       lty=c(2,2), lwd=c(2,2))
+
 ```
 
 ## The function `lprq`
 
-This function does locally polynomial quantile regression univariate smoothing
+This function does *locally polynomial quantile regression* univariate smoothing
 
 ```{r echo=TRUE, eval=FALSE}
 
@@ -556,12 +582,16 @@ for(tau in taus){
     lines(fit$xx, fit$fv, col="green3", lwd=2)
   }
 }
+
+legend("topright",1, legend= c("quantiles","median"),title="Est. quantities",
+  col = c(3,4), lty=c(1,1), lwd=c(2,2))
+
 ```
 
 
 ## The function `rqss`
 
-`rqss` fits additive quantile regression models with possible univariate and/or bivariate
+`rqss` fits *additive quantile regression* models with possible univariate and/or bivariate
 nonparametric terms.
 
 
