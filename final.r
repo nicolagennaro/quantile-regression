@@ -13,7 +13,12 @@ for( str in to_scale){
     ( max(house[str]) - min(house[str]) )
 }
 
+house <- house[ which(house$median_house_value != 1), ]
+
 summary(house)
+dim(house)
+
+plot(house$median_income, house$median_house_value)
 
 
 library(quantreg)
@@ -21,6 +26,43 @@ library(quantreg)
 taus <- c(.05, .10, .25, .50, .75, .90, .95)
 
 
+
+# slide 21
+
+set.seed(3)
+res.house <- house[ sample(1:nrow(house), 5000), ]
+fit <- rq(median_house_value ~ ., tau=taus, data=res.house)
+plot.summary.rqs(summary.rqs(fit))
+
+
+
+
+
+
+legend("bottomright", 1, legend= c(paste(taus, " quantile"),"mean"),title="Est. quantities",
+       col = c((2:(length(taus)+1)), 8), lty=c(3,3,1,3,3,2), lwd=c(rep(3,length(taus)),4))
+
+
+
+
+n <- (2^8)+1
+x <- seq(0, 2, length=n)
+y <- -x + rnorm(n)
+df <- data.frame(x, y)
+b <- boot.rq(x=x, y=y, tau=.5, R = 1000)
+main <- paste(n, "Points")
+m <- mean(b$B) + 1
+s <- sd(b$B)
+hist(b$B + 1, breaks = 30, prob=TRUE, xlab = "B* - B", main = main)
+abline(v=0, add=TRUE, col='red', lty=2, lwd=2)
+abline(v=m, add=TRUE, col='green', lty=2, lwd=2)
+curve(dnorm(x, m, s), add=TRUE)
+
+
+# slide 
+
+legend("topright", 1, legend = c("real mean","sample mean"), col = c("red", "green"),
+       lty=c(2,2), lwd=c(2,2))
 
 
 
@@ -30,8 +72,8 @@ taus <- c(.05, .10, .25, .50, .75, .90, .95)
 
 
 
-set.seed(2)
-res.house <- house[ sample(1:nrow(house), 1000-5), ]
+set.seed(1)
+res.house <- house[ sample(1:nrow(house), 100), ]
 dim(res.house)
 
 v <- which(house$ocean_proximity == 'ISLAND')
@@ -44,7 +86,7 @@ sum(duplicated(res.house))
 
 summary(res.house)
 
-fit <- rq(median_house_value ~ ., tau=taus, data=res.house)
+fit <- rq(median_house_value ~ median_income + ocean_proximity, tau=taus, data=house)
 
 
 summary(fit)
