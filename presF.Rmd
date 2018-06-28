@@ -138,12 +138,12 @@ $$
 
 ```{r echo=FALSE, eval=TRUE, fig.height=2,fig.width=2, fig.align="center"}
 par(mar=c(5, 4, 2, 2) + 0.1)
-plot(0,0,ylim=c(0,2), xlab="", ylab="")
-segments(0,0,1,2)
-segments(0,0,-2,1)
+plot(0,0,ylim=c(0,1), xlab="", ylab="")
+segments(0,0,1,0.7)
+segments(0,0,-1,0.3)
 abline(h=0)
-text(0.5,1.25,expression(tau))
-text(-0.5,0.65,expression(1-tau))
+text(0.5,0.55,expression(tau))
+text(-0.5,0.4,expression(tau-1))
 ```
 
 ## Under the hood
@@ -488,8 +488,9 @@ The results shows that the additional covariate `total_rooms` is not significant
 
 ```{r echo=TRUE}
 newdata <- house[3,]
-yy<-predict.rq(object=fit.1,newdata=newdata,type="none", 
-               stepfun = FALSE)
+yy<-predict.rq(object=fit.1,newdata=newdata,
+               type="percentile", interval="confidence",
+               se='boot')
 yy
 ```
 
